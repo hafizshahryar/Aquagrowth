@@ -1,0 +1,5 @@
+{
+  "name": "AquaGrowth AI",
+  "description": "A comprehensive fish farming assistant that calculates growth performance metrics (FCR, SGR, Survival Rate) and tracks historical data. Features AI-powered insights using Gemini 2.5 Flash to optimize aquaculture efficiency.",
+  "requestFramePermissions": []
+}
