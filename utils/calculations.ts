@@ -1,5 +1,13 @@
 import { FishBatch, GrowthRecord, CalculatedMetrics, BatchPerformanceMetrics } from '../types';
 
+// Robust ID generator that works in non-secure contexts (http) where crypto.randomUUID might be missing
+export const generateId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
 export const calculateDaysBetween = (start: string, end: string): number => {
   const diff = new Date(end).getTime() - new Date(start).getTime();
   return Math.max(1, Math.ceil(diff / (1000 * 3600 * 24)));

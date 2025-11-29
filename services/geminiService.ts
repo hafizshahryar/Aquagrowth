@@ -2,9 +2,11 @@ import { GoogleGenAI } from "@google/genai";
 import { CalculatedMetrics, FishBatch, GrowthRecord, BatchPerformanceMetrics } from "../types";
 
 const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
+  // Safely check if process exists to avoid "process is not defined" errors in browser
+  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+  
   if (!apiKey) {
-    console.error("API Key not found in environment variables");
+    console.warn("API Key not found in environment variables");
     return null;
   }
   return new GoogleGenAI({ apiKey });
@@ -17,7 +19,7 @@ export const analyzeGrowthData = async (
   cumulativeMetrics: BatchPerformanceMetrics
 ): Promise<string> => {
   const client = getAIClient();
-  if (!client) return "Unable to connect to AI service. Please check your API key.";
+  if (!client) return "Unable to connect to AI service. API Key is missing or invalid.";
 
   const prompt = `
     Act as a senior aquaculture specialist. Analyze the following fish growth data and provide actionable advice.

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FishBatch } from '../types';
 import { Plus } from 'lucide-react';
+import { generateId } from '../utils/calculations';
 
 interface BatchFormProps {
   onSave: (batch: FishBatch) => void;
@@ -20,7 +21,7 @@ export const BatchForm: React.FC<BatchFormProps> = ({ onSave, onCancel }) => {
     e.preventDefault();
     onSave({
       ...formData,
-      id: crypto.randomUUID()
+      id: generateId()
     });
   };
 

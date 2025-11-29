@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GrowthRecord, FishBatch } from '../types';
 import { Scale, Ruler, Utensils } from 'lucide-react';
+import { generateId } from '../utils/calculations';
 
 interface GrowthEntryFormProps {
   batch: FishBatch;
@@ -22,7 +23,7 @@ export const GrowthEntryForm: React.FC<GrowthEntryFormProps> = ({ batch, lastRec
     e.preventDefault();
     onSave({
       ...formData,
-      id: crypto.randomUUID(),
+      id: generateId(),
       batchId: batch.id
     });
   };

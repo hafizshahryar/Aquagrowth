@@ -20,8 +20,21 @@ import {
   Download,
   Calendar,
   BarChart3,
-  Fish
+  Fish,
+  Share2,
+  X,
+  Copy,
+  Check,
+  HelpCircle,
+  Monitor,
+  Smartphone
 } from 'lucide-react';
+
+// Interface for the PWA install prompt event
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 // Main App Component
 const App: React.FC = () => {
@@ -35,18 +48,52 @@ const App: React.FC = () => {
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Load data on mount
+  // PWA & Share State
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Load data on mount & Setup PWA Listener
   useEffect(() => {
-    const savedBatches = localStorage.getItem('aqua_batches');
-    const savedRecords = localStorage.getItem('aqua_records');
-    if (savedBatches) setBatches(JSON.parse(savedBatches));
-    if (savedRecords) setRecords(JSON.parse(savedRecords));
+    try {
+      const savedBatches = localStorage.getItem('aqua_batches');
+      const savedRecords = localStorage.getItem('aqua_records');
+      
+      if (savedBatches) {
+        setBatches(JSON.parse(savedBatches));
+      }
+      if (savedRecords) {
+        setRecords(JSON.parse(savedRecords));
+      }
+    } catch (e) {
+      console.error("Failed to load data from local storage:", e);
+      // Fallback to empty if data is corrupted to prevent crash
+      setBatches([]);
+      setRecords({});
+    }
+
+    // PWA Install Prompt Listener
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   // Save data on change
   useEffect(() => {
-    localStorage.setItem('aqua_batches', JSON.stringify(batches));
-    localStorage.setItem('aqua_records', JSON.stringify(records));
+    try {
+      localStorage.setItem('aqua_batches', JSON.stringify(batches));
+      localStorage.setItem('aqua_records', JSON.stringify(records));
+    } catch (e) {
+      console.error("Failed to save data:", e);
+    }
   }, [batches, records]);
 
   // Derived State
@@ -157,6 +204,45 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // PWA Handlers
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      setShowInstallModal(true);
+    }
+  };
+
+  const handleShare = async () => {
+    // Basic check for mobile share capability
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (isMobile && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'AquaGrowth AI',
+          text: 'Check out this Fish Farming Performance Calculator!',
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.error('Share failed:', err);
+      }
+    } else {
+      // On Desktop or if share fails, show the modal
+      setShowShareModal(true);
+    }
+  };
+  
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   // Views
   const renderHeader = () => (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm safe-top">
@@ -168,16 +254,48 @@ const App: React.FC = () => {
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">AquaGrowth AI</h1>
         </div>
         
-        {/* Desktop Action Button */}
-        {view === 'list' && (
+        <div className="flex items-center gap-2">
+           {/* Install Button */}
           <button 
-            onClick={() => setView('create_batch')}
-            className="hidden md:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
+            onClick={handleInstallClick}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors relative"
+            title="Install App"
           >
-            <Plus className="w-4 h-4" />
-            <span>New Batch</span>
+            <Download className="w-5 h-5" />
+            {deferredPrompt && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full"></span>
+            )}
           </button>
-        )}
+
+           {/* Share Button */}
+           <button 
+            onClick={handleShare}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+            title="Share App"
+          >
+            <Share2 className="w-5 h-5" />
+          </button>
+
+          {/* Help Button (for link) */}
+          <button 
+            onClick={() => setShowShareModal(true)}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+            title="Help & Link"
+          >
+            <HelpCircle className="w-5 h-5" />
+          </button>
+
+          {/* Desktop Create Button */}
+          {view === 'list' && (
+            <button 
+              onClick={() => setView('create_batch')}
+              className="hidden md:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ml-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Batch</span>
+            </button>
+          )}
+        </div>
       </div>
     </header>
   );
@@ -196,12 +314,22 @@ const App: React.FC = () => {
           title="No fish batches yet" 
           description="Start tracking your fish growth performance by creating your first batch."
           action={
-            <button 
-              onClick={() => setView('create_batch')}
-              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
-            >
-              Start First Batch
-            </button>
+            <div className="flex flex-col items-center gap-4">
+              <button 
+                onClick={() => setView('create_batch')}
+                className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+              >
+                Start First Batch
+              </button>
+              <div className="bg-blue-50 p-4 rounded-lg mt-4 max-w-sm">
+                <p className="text-sm text-blue-800 font-medium mb-1 flex items-center gap-2">
+                   <Monitor className="w-4 h-4" /> Works on Desktop too!
+                </p>
+                <p className="text-xs text-blue-600">
+                  If the app isn't loading on your laptop, try clearing your browser cache or clicking the <HelpCircle className="w-3 h-3 inline" /> icon to reset.
+                </p>
+              </div>
+            </div>
           }
         />
       ) : (
@@ -270,7 +398,7 @@ const App: React.FC = () => {
       {/* Mobile Floating Action Button */}
       <button 
         onClick={() => setView('create_batch')}
-        className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-50 safe-pb"
+        className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-40 safe-pb"
         aria-label="Create New Batch"
       >
         <Plus className="w-8 h-8" />
@@ -308,7 +436,7 @@ const App: React.FC = () => {
               className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-sm font-medium transition-colors"
             >
               <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">Export CSV</span>
             </button>
             <button 
               onClick={() => deleteBatch(activeBatch.id)}
@@ -521,7 +649,7 @@ const App: React.FC = () => {
         {/* Mobile Floating Action Button for Add Record */}
         <button 
           onClick={() => setView('add_record')}
-          className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-50 safe-pb"
+          className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-40 safe-pb"
           aria-label="Add Measurement"
         >
           <Plus className="w-8 h-8" />
@@ -559,6 +687,95 @@ const App: React.FC = () => {
 
         {view === 'details' && renderDashboard()}
       </main>
+
+      {/* Install Modal (For unsupported browsers/iOS) */}
+      {showInstallModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative animate-in fade-in zoom-in duration-200">
+            <button 
+              onClick={() => setShowInstallModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-slate-800 mb-4">Install App</h3>
+            <p className="text-slate-600 mb-4 text-sm">
+              You can install AquaGrowth for easier access:
+            </p>
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg flex gap-3">
+                 <div className="bg-blue-100 p-2 rounded h-fit">
+                    <Smartphone className="w-5 h-5 text-blue-600" />
+                 </div>
+                 <div>
+                    <h4 className="font-semibold text-slate-800 text-sm mb-1">Mobile (iOS/Android)</h4>
+                    <p className="text-xs text-slate-500">
+                      Tap <span className="font-bold">Share</span> <Share2 className="w-3 h-3 inline" /> or <span className="font-bold">Menu</span> (3 dots), then select <span className="font-bold">"Add to Home Screen"</span>.
+                    </p>
+                 </div>
+              </div>
+              
+              <div className="bg-slate-50 p-3 rounded-lg flex gap-3">
+                 <div className="bg-blue-100 p-2 rounded h-fit">
+                    <Monitor className="w-5 h-5 text-blue-600" />
+                 </div>
+                 <div>
+                    <h4 className="font-semibold text-slate-800 text-sm mb-1">Desktop (Chrome/Edge)</h4>
+                    <p className="text-xs text-slate-500">
+                      Look for the <span className="font-bold">Install icon</span> (computer with down arrow) in the right side of your address bar.
+                    </p>
+                 </div>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowInstallModal(false)}
+              className="mt-6 w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Share/Link Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative animate-in fade-in zoom-in duration-200">
+              <button 
+                onClick={() => setShowShareModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">Share & Access</h3>
+              <p className="text-sm text-slate-500 mb-4">
+                Use this link to access the app on any device (Laptop or Mobile).
+              </p>
+              
+              <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200 mb-4">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={window.location.href} 
+                  className="bg-transparent text-sm text-slate-600 flex-1 outline-none w-full"
+                />
+                <button 
+                  onClick={handleCopyLink}
+                  className="p-2 bg-white rounded-md shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
+                >
+                  {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
+                </button>
+              </div>
+              
+              <button 
+                onClick={() => setShowShareModal(false)}
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
+              >
+                Done
+              </button>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
